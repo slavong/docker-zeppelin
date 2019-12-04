@@ -15,27 +15,87 @@
 # limitations under the License.
 #
 
-[users]
-# List of users with their password allowed to access Zeppelin.
-# To use a different strategy (LDAP / Database / ...) check the shiro doc at http://shiro.apache.org/configuration.html#Configuration-INISections
-zeppelin = $ZEPPELIN_PASSWORD
-
 # Sample LDAP configuration, for user Authentication, currently tested for single Realm
 [main]
-#ldapRealm = org.apache.shiro.realm.ldap.JndiLdapRealm
-#ldapRealm.userDnTemplate = cn={0},cn=engg,ou=testdomain,dc=testdomain,dc=com
-#ldapRealm.contextFactory.url = ldap://ldaphost:389
-#ldapRealm.contextFactory.authenticationMechanism = SIMPLE
+#iniRealm = org.apache.shiro.realm.text.IniRealm
+passwordMatcher = org.apache.shiro.authc.credential.PasswordMatcher
+iniRealm.credentialsMatcher = $passwordMatcher
+
+ldapRealm = org.apache.zeppelin.realm.LdapRealm
+ldapRealm.contextFactory.url = $ZEPPELIN_LDAP_PROTOCOL://$ZEPPELIN_LDAP_SERVER:$ZEPPELIN_LDAP_PORT
+#ldapRealm.contextFactory.systemAuthenticationMechanism = 
+#ldapRealm.contextFactory.systemUsername = 
+#ldapRealm.contextFactory.systemPassword = 
+ldapRealm.contextFactory.authenticationMechanism = simple
+# Ability to set ldap paging Size if needed default is 100
+ldapRealm.pagingSize = 100
+ldapRealm.authorizationEnabled = true
+ldapRealm.searchBase = $ZEPPELIN_LDAP_SEARCH_BASE
+ldapRealm.userSearchBase = ou=People,$ZEPPELIN_LDAP_SEARCH_BASE
+ldapRealm.groupSearchBase = ou=Groups,$ZEPPELIN_LDAP_SEARCH_BASE
+ldapRealm.userObjectClass = inetOrgPerson
+ldapRealm.groupObjectClass = groupOfUniqueNames
+# Allow userSearchAttribute to be customized
+ldapRealm.userSearchAttributeName = dn
+ldapRealm.memberAttribute = uniqueMember
+# force usernames returned from ldap to lowercase useful for AD
+ldapRealm.userLowerCase = false
+# ability set searchScopes subtree (default), one, base
+ldapRealm.userSearchScope = base
+ldapRealm.groupSearchScope = base
+ldapRealm.memberAttributeValueTemplate = uid={0},ou=People,$ZEPPELIN_LDAP_SEARCH_BASE
+ldapRealm.userSearchFilter=(&(objectclass=inetOrgPerson)(uid={0}))
+# enable support for nested groups using the LDAP_MATCHING_RULE_IN_CHAIN operator
+ldapRealm.groupSearchEnableMatchingRuleInChain = false
+# optional mapping from physical groups to logical application roles
+ldapRealm.rolesByGroup = $ZEPPELIN_LDAP_USER_GROUP: users, $ZEPPELIN_LDAP_ADMIN_GROUP: admins
+# optional list of roles that are allowed to authenticate. Incase not present all groups are allowed to authenticate (login).
+# This changes nothing for url specific permissions that will continue to work as specified in [urls].
+ldapRealm.allowedRolesForAuthentication = users, admins
+ldapRealm.permissionsByRole = users:"*:ToDoItemsJdo:*:*, *:ToDoItem:*:*", admins:"*"
+securityManager.realms = $ldapRealm
+
+cacheManager = org.apache.shiro.cache.MemoryConstrainedCacheManager
+securityManager.cacheManager = $cacheManager
 
 sessionManager = org.apache.shiro.web.session.mgt.DefaultWebSessionManager
+
+cookie = org.apache.shiro.web.servlet.SimpleCookie
+cookie.name = JSESSIONID
+#cookie.secure = true
+cookie.httpOnly = true
+sessionManager.sessionIdCookie = $cookie
+
 securityManager.sessionManager = $sessionManager
+#securityManager.realms = $ldapRealm, $iniRealm
+
 securityManager.sessionManager.globalSessionTimeout = 86400000
 
 shiro.loginUrl = /api/login
+
+#anyofrolesuser = org.apache.zeppelin.utils.AnyOfRolesUserAuthorizationFilter
+
+[roles]
+admins = *
+users = *
+
+[users]
+# List of users with their password allowed to access Zeppelin.
+# To use a different strategy (LDAP / Database / ...) check the shiro doc at http://shiro.apache.org/configuration.html#Configuration-INISections
+zeppelin = $ZEPPELIN_PASSWORD, admins, users
+developer = $ZEPPELIN_DEVELOPER_PASSWORD, users
 
 [urls]
 # anon means the access is anonymous.
 # authcBasic means Basic Auth Security
 # To enfore security, comment the line below and uncomment the next one
+/api/admin/** = authc, roles[admins]
+/api/interpreter/setting/restart/** = authc, roles[admins, users]
+/api/interpreter/** = authc, roles[admins]
+/api/notebook-repositories/** = authc, roles[admins]
+/api/notebook/** = authc, roles[admins, users]
+/api/configurations/** = authc, roles[admins]
+/api/credential/** = authc, roles[admins]
 /api/version = anon
 /** = authc
+

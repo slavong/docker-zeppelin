@@ -22,29 +22,6 @@ RUN \
     unzip && \
   apt-get clean all
 
-# INSTALL ORACLE INSTANT CLIENT
-RUN mkdir -p opt/oracle
-ADD ./oracle/linux/ .
-RUN unzip instantclient-basic-linux.x64.zip -d /opt/oracle \
- && unzip instantclient-sdk-linux.x64.zip -d /opt/oracle  \
- && unzip instantclient-sqlplus-linux.x64.zip -d /opt/oracle \
- && mv /opt/oracle/instantclient_* /opt/oracle/instantclient \
- && ln -s /opt/oracle/instantclient/libclntsh.so.* /opt/oracle/instantclient/libclntsh.so \
- && ln -s /opt/oracle/instantclient/libocci.so.* /opt/oracle/instantclient/libocci.so
-RUN mkdir -p opt/oracle/instantclient/network/admin
-
-ENV OCI_HOME="/opt/oracle/instantclient"
-ENV OCI_LIB_DIR="/opt/oracle/instantclient"
-ENV OCI_INCLUDE_DIR="/opt/oracle/instantclient/sdk/include"
-ENV OCI_VERSION=12
-ENV LD_LIBRARY_PATH="/opt/oracle/instantclient"
-ENV TNS_ADMIN="/opt/oracle/instantclient"
-ENV ORACLE_BASE="/opt/oracle/instantclient"
-ENV ORACLE_HOME="/opt/oracle/instantclient"
-ENV PATH="/opt/oracle/instantclient:$PATH"
-RUN echo '/opt/oracle/instantclient/' | tee -a /etc/ld.so.conf.d/oracle_instant_client.conf && ldconfig
-
-
 RUN echo 'export PATH=/opt/conda/bin:$PATH' > /etc/profile.d/conda.sh && \
   wget --quiet https://repo.continuum.io/archive/Anaconda2-4.2.0-Linux-x86_64.sh -O ~/anaconda.sh && \
   /bin/bash ~/anaconda.sh -b -p /opt/conda && \
@@ -58,6 +35,8 @@ ADD spark /usr/local/spark
 ADD zeppelin /usr/local/zeppelin
 WORKDIR /usr/local/zeppelin
 
+ADD shiro-tools-hasher-1.3.2-cli.jar .
+
 RUN rm -rf conf
 
 COPY conf.templates conf.templates
@@ -65,6 +44,7 @@ COPY conf.templates conf.templates
 VOLUME ["/usr/local/zeppelin/notebooks"]
 VOLUME ["/usr/local/zeppelin/conf"]
 VOLUME ["/hive"]
+VOLUME ["/etc/ssl/certs"]
 
 EXPOSE 8080
 
